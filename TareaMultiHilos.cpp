@@ -1,113 +1,108 @@
-#include <iostream>
+/**
+  * AUTORES:    Bruno Gabriel Carrada Alarcon
+  *             Calzontzi Hernandez Yaretzi
+  *             Contreras Colmenero Emilio Sebastian        
+  * FECHA DE ELABORACIÃ“N: 24/06/2024
+  * PROPÃ“SITO: SimulaciÃ³n del manejo de saldo en una cuenta bancaria 
+    usando hilos POSIX en C.
+  **/
+
+#include <stdio.h>
+#include <stdlib.h>
 #include <pthread.h>
-#include <unistd.h>  // Para usar sleep()
-#include <vector>
 
-using namespace std;
+#define SALDO_INICIAL 100000
+#define SALDO_MINIMO 0
+#define SALDO_MAXIMO 1000000
+#define NUM_OPERACIONES 10000
+#define NUM_MONTOS 100
 
-// Variables globales compartidas
-double saldo = 100000;  // Saldo inicial de 100,000
-int peticion = 0;  // Petición de cargo o abono (0 significa ninguna operación en espera)
-bool operacionExitosa = false;  // Resultado de la operación (true si fue exitosa)
+// Variables globales 
+int saldo = SALDO_INICIAL;
+int peticion = 0;
+int respuesta = 0;
+int operaciones_exitosas_servicio = 0;
+int operaciones_fallidas_servicio = 0;
+int operaciones_exitosas_cliente = 0;
+int operaciones_fallidas_cliente = 0;
 
-// Variables para contar operaciones exitosas y fallidas
-int operacionesExitosasServicio = 0;
-int operacionesFallidasServicio = 0;
-int operacionesExitosasCliente = 0;
-int operacionesFallidasCliente = 0;
+// Mutex para controlar el acceso a las variables compartidas
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
-// Mutex para sincronización
-pthread_mutex_t mutexOperacion = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t condicionOperacion = PTHREAD_COND_INITIALIZER;
+// Funciones de los hilos con sus respectivos nombres 
+void* servicio(void* arg);
+void* cliente(void* arg);
 
-// Función del hilo "servicio"
-void* servicio(void* arg) {
-    while (true) {
-        pthread_mutex_lock(&mutexOperacion);
-        
-        // Espera a que haya una petición
-        while (peticion == 0) {
-            pthread_cond_wait(&condicionOperacion, &mutexOperacion);
-        }
-        
-        // Procesar la petición
-        double nuevoSaldo = saldo + peticion;
-        if (nuevoSaldo >= 0 && nuevoSaldo <= 1000000) {
-            saldo = nuevoSaldo;
-            operacionExitosa = true;
-            operacionesExitosasServicio++;
-        } else {
-            operacionExitosa = false;
-            operacionesFallidasServicio++;
-        }
-        
-        // Reseteamos la petición
-        peticion = 0;
-        
-        // Notificamos al cliente que la operación fue procesada
-        pthread_cond_signal(&condicionOperacion);
-        
-        pthread_mutex_unlock(&mutexOperacion);
-    }
-    
-    return nullptr;
-}
-
-// Función del hilo "cliente"
-void* cliente(void* arg) {
-    vector<int> montos = {500, -200, 300, -400, 2000, -1500, 3000, -1000, 100, -50, /*...*/};  // Ejemplo de montos
-    int totalMovimientos = 10000;
-    
-    for (int i = 0; i < totalMovimientos; i++) {
-        pthread_mutex_lock(&mutexOperacion);
-        
-        // Espera hasta que no haya ninguna operación en proceso
-        while (peticion != 0) {
-            pthread_cond_wait(&condicionOperacion, &mutexOperacion);
-        }
-        
-        // Establecemos la petición
-        peticion = montos[i % montos.size()];
-        
-        // Notificamos al servicio
-        pthread_cond_signal(&condicionOperacion);
-        
-        // Esperamos la respuesta del servicio
-        while (peticion != 0) {
-            pthread_cond_wait(&condicionOperacion, &mutexOperacion);
-        }
-        
-        // Registramos si la operación fue exitosa o fallida
-        if (operacionExitosa) {
-            operacionesExitosasCliente++;
-        } else {
-            operacionesFallidasCliente++;
-        }
-        
-        pthread_mutex_unlock(&mutexOperacion);
-    }
-    
-    return nullptr;
-}
+// Montos de prueba 
+int montos[NUM_MONTOS] = 
+{1000, -500, 2000, -1500, 3000, -2500, 4000, -3500, 5000, -4500, 
+1000, -5000, 2000, -1500, 3000, -2500, 4000, -3500, 5000, -4500, 
+1000, -500, 2000, -1500, 3000, -2500, 4000, -3500, 5000, -4500, 
+1000, -500, 2000, -1500, 3000, -2500, 4000, -3500, 5000, -4500, 
+1000, -500, 2000, -1500, 3000, -2500, 4000, -3500, 5000, -4500, 
+1000, -500, 2000, -1500, 3000, -2500, 4000, -3500, 5000, -4500, 
+1000, -500, 2000, -1500, 3000, -2500, 4000, -3500, 5000, -4500, 
+1000, -500, 2000, -1500, 3000, -2500, 4000, -3500, 5000, -4500, 
+1000, -500, 2000, -1500, 3000, -2500, 4000, -3500, 5000, -4500, 
+1000, -500, 2000, -1500, 3000, -2500, 4000, -3500, 5000, -4500};
 
 int main() {
-    pthread_t hiloServicio, hiloCliente;
+    pthread_t hilo_servicio, hilo_cliente;
     
-    // Crear hilos
-    pthread_create(&hiloServicio, nullptr, servicio, nullptr);
-    pthread_create(&hiloCliente, nullptr, cliente, nullptr);
-    
+    // Creamos los dos hilos
+    pthread_create(&hilo_servicio, NULL, servicio, NULL);
+    pthread_create(&hilo_cliente, NULL, cliente, NULL);
+
     // Esperar a que el cliente termine
-    pthread_join(hiloCliente, nullptr);
+    pthread_join(hilo_cliente, NULL);
     
-    // Imprimir resultados
-    cout << "Cliente:" << endl;
-    cout << "Operaciones exitosas: " << operacionesExitosasCliente << endl;
-    cout << "Operaciones fallidas: " << operacionesFallidasCliente << endl;
+    // Mnadamos los resultados a pantalla
+    printf("Operaciones exitosas del cliente: %d\n", operaciones_exitosas_cliente);
+    printf("Operaciones fallidas del cliente: %d\n", operaciones_fallidas_cliente);
+    printf("Operaciones exitosas del servicio: %d\n", operaciones_exitosas_servicio);
+    printf("Operaciones fallidas del servicio: %d\n", operaciones_fallidas_servicio);
     
-    cout << "Servicio:" << endl;
-    cout << "Operaciones exitosas: " << operacionesExitosasServicio << endl;
-    cout << "Operaciones fallidas: " << operacionesFallidasServicio << endl;
+    // Terminar el servicio
+    pthread_cancel(hilo_servicio);
     
     return 0;
+}
+
+void* servicio(void* arg) {
+    while (1) {
+        pthread_mutex_lock(&mutex);
+        if (peticion != 0) {
+            int nuevo_saldo = saldo + peticion;
+            if (nuevo_saldo >= SALDO_MINIMO && nuevo_saldo <= SALDO_MAXIMO) {
+                saldo = nuevo_saldo;
+                respuesta = 1;  // OperaciÃ³n exitosa
+                operaciones_exitosas_servicio++;
+            } else {
+                respuesta = -1;  // OperaciÃ³n fallida
+                operaciones_fallidas_servicio++;
+            }
+            peticion = 0;  // Reseteamos la peticiÃ³n para esperar una nueva
+        }
+        pthread_mutex_unlock(&mutex);
+    }
+    return NULL;
+}
+
+void* cliente(void* arg) {
+    for (int i = 0; i < NUM_OPERACIONES; i++) {
+        pthread_mutex_lock(&mutex);
+        peticion = montos[i % NUM_MONTOS];
+        respuesta = 0;  // Valor especial para esperar la respuesta
+        pthread_mutex_unlock(&mutex);
+
+        // Esperar respuesta del servicio
+        while (respuesta == 0);
+
+        if (respuesta == 1) {
+            operaciones_exitosas_cliente++;
+        } else {
+            operaciones_fallidas_cliente++;
+        }
+    }
+    return NULL;
 }
