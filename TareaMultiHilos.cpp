@@ -2,7 +2,7 @@
   * AUTORES:    Bruno Gabriel Carrada Alarcon
   *             Calzontzi Hernandez Yaretzi
   *             Contreras Colmenero Emilio Sebastian        
-  * FECHA DE ELABORACIÃ“N: 24/06/2024
+  * FECHA DE ELABORACIÃ“N: 26/06/2024
   * PROPÃ“SITO: SimulaciÃ³n del manejo de saldo en una cuenta bancaria 
     usando hilos POSIX en C.
   **/
